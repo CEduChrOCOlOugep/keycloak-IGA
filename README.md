@@ -1,4 +1,4 @@
-![Keycloak](https://github.com/keycloak/keycloak-misc/blob/main/logo/logo.svg)
+![Keycloak IGA Header](https://github.com/user-attachments/assets/bb1b7336-4566-49bb-85d3-4fbaad5fdf0e)
 
 ![GitHub Release](https://img.shields.io/github/v/tag/tide-foundation/keycloak-IGA?label=latest%20release)
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/6818/badge)](https://bestpractices.coreinfrastructure.org/projects/6818)
@@ -9,11 +9,18 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/keycloak/keycloak)
 [![Translation status](https://hosted.weblate.org/widget/keycloak/svg-badge.svg)](docs/translation.md)
 
-# Open Source Identity and Access Management
+## About this Fork: Keycloak IGA
 
-Add authentication to applications and secure services with minimum effort. No need to deal with storing users or authenticating users.
+This is a fork of Open Source Identity and Access Management Keycloak, enhanced with **Identity Governance and Administration (IGA)** features. It includes:
 
-Keycloak provides user federation, strong authentication, user management, fine-grained authorization, and more.
+- Custom SPI providers for realms, users, roles, and clients
+- Easy dev-mode startup with preconfigured extensions
+
+> ⚠️ This fork is intended for testing and evaluation of IGA capabilities. It may eventually be released or contributed upstream.
+
+## Rational
+
+Please see [Community Epic: Introduce foundational Identity Governance & Administration (IGA) capabilities into Keycloak](https://gist.github.com/ondamike/191ae64890b0e9b9ba4699f464108c05)
 
 ---
 
@@ -143,64 +150,120 @@ These go through an approval process instead of immediate execution.
 
 ---
 
-## Help and Documentation
+### Getting Started (Keycloak IGA)
 
-* [Documentation](https://www.keycloak.org/documentation.html)
-* [User Mailing List](https://groups.google.com/d/forum/keycloak-user) - Mailing list for help and general questions about Keycloak
-* Join [#keycloak](https://cloud-native.slack.com/archives/C056HC17KK9) for general questions, or [#keycloak-dev](https://cloud-native.slack.com/archives/C056XU905S6) on Slack for design and development discussions, by creating an account at [https://slack.cncf.io/](https://slack.cncf.io/).
+> **Supported branches:**, `26.2.5-IGA`
+>
+> The latest supported release is `26.2.5-IGA`. Future version tags may be supported as well.
+
+#### 1. Clone the repository
+
+```bash
+git clone --branch 26.2.5-IGA --single-branch https://github.com/tide-foundation/keycloak-IGA.git
+cd keycloak-IGA
+```
+
+#### 2. Run the build and setup script
+
+```bash
+./build-kc-with-iga.sh
+```
+
+This script will:
+
+- Build all necessary IGA JARs
+- Build Keycloak with the required Quarkus modules
+- Inject the JARs into the correct `providers/` folder
+- Generate a `conf/keycloak.conf` file for IGA SPI configuration
+- Display the path to the final `kc.sh` script to run
+
+#### 3. Start Keycloak in development mode
+
+After the script finishes, it will print something like:
+
+```bash
+./tmp_kc/keycloak-<version>/bin/kc.sh start-dev
+```
+
+Simply copy and run the printed command to launch Keycloak with your IGA extensions active.
+
+---
+
+## Keycloak IGA Guide
+
+This fork introduces a set of [Keycloak SPI](https://www.keycloak.org/docs/latest/server_development/#_providers) extensions to support IGA (Identity Governance and Administration) functionality.
+
+### Features
+
+- **Custom User Provider** (`tide-User-Provider`)
+- **Custom Realm Provider** (`tideRealmProvider`)
+- **Client and Role providers** for advanced governance
+
+### Configuration
+
+The following is automatically set in `conf/keycloak.conf`:
+
+```properties
+spi-user-provider=tide-User-Provider
+spi-realm-provider=tideRealmProvider
+spi-client-provider=tideClientProvider
+spi-role-provider=tide-role-provider
+```
+
+The build script ensures these JARs are installed into `providers/` of the distribution.
+
+---
+
+## IGA Role & Access Governance Model
+
+This fork introduces a custom JPA provider to manage identity lifecycle and governance for:
+
+- **Users**
+- **Roles**
+- **Composite roles**
+- **Role mappings**
+- **Clients**
+
+Unlike default Keycloak behavior where access updates take effect immediately, this fork introduces a **drafting and approval workflow** to improve security and oversight.
+
+### JPA Structure Enhancements
+
+The schema mirrors standard Keycloak tables with added governance fields such as:
+
+- `draftStatus` (`pending`, `approved`, `rejected`, `active`)
 
 
-## Reporting Security Vulnerabilities
+### Role Assignment Rules
 
-If you have found a security vulnerability, please look at the [instructions on how to properly report it](https://github.com/keycloak/keycloak/security/policy).
+- Only **active** roles are included in the user's access token.
+- You can:
+  - Assign roles to users
+  - Remove roles from users
+  - Enable/disable full scope on a client
+  - Add composite role relationships
 
+### Drafting Triggers
 
-## Reporting an issue
+Changes requiring approval include:
 
-If you believe you have discovered a defect in Keycloak, please open [an issue](https://github.com/keycloak/keycloak/issues).
-Please remember to provide a good summary, description as well as steps to reproduce the issue.
+- Assigning/removing active roles from users
+- Deleting roles already assigned to users
+- Enabling/disabling full-scope on clients if users exist in that realm
 
+These go through an approval process instead of immediate execution.
 
-## Getting started
+### Authority Delegation & Quorum
 
-To run Keycloak, download the distribution from our [website](https://www.keycloak.org/downloads.html). Unzip and run:
+- Initially, the **master admin** has approval rights.
+- The master admin can delegate realm control by assigning the `realm-admin` role.
+- Once delegated, the master admin relinquishes approval rights.
+- Realm-admins can assign other realm-admins.
 
-    bin/kc.[sh|bat] start-dev
+#### 🗳 Quorum Approval
 
-Alternatively, you can use the Docker image by running:
-
-    docker run quay.io/keycloak/keycloak start-dev
-    
-For more details refer to the [Keycloak Documentation](https://www.keycloak.org/documentation.html).
-
-
-## Building from Source
-
-To build from source, refer to the [building and working with the code base](docs/building.md) guide.
-
-
-### Testing
-
-To run tests, refer to the [running tests](docs/tests.md) guide.
-
-
-### Writing Tests
-
-To write tests, refer to the [writing tests](docs/tests-development.md) guide.
-
-
-## Contributing
-
-Before contributing to Keycloak, please read our [contributing guidelines](CONTRIBUTING.md). Participation in the Keycloak project is governed by the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md).
-
-Joining a [community meeting](https://www.keycloak.org/community) is a great way to get involved and help shape the future of Keycloak.
-
-## Other Keycloak Projects
-
-* [Keycloak](https://github.com/keycloak/keycloak) - Keycloak Server and Java adapters
-* [Keycloak QuickStarts](https://github.com/keycloak/keycloak-quickstarts) - QuickStarts for getting started with Keycloak
-* [Keycloak Node.js Connect](https://github.com/keycloak/keycloak-nodejs-connect) - Node.js adapter for Keycloak
-
+- A configurable quorum is enforced (currently: 70%).
+- If 3 realm-admins exist, any change requires approval from at least 2.
+- Once quorum is met, any realm-admin can **commit** the change.
 
 ## License
 
